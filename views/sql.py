@@ -6,7 +6,6 @@ from core.db import q, schema
 from core.state import get_con
 
 st.title("🧮 Interogări SQL")
-st.caption("Toate cele 3 surse sunt încărcate într-o bază SQLite. Poți rula orice interogare SELECT.")
 
 con, tables, log = get_con()
 st.dataframe(schema(con), hide_index=True)

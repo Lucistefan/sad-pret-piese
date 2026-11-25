@@ -72,7 +72,9 @@ def build_context(con, tables, log, p=None):
             "preturi_cat": pc}
 
 
-def sql_box(sql, params_=None, title="Interogarea SQL executată"):
+def sql_box(sql, params_=None, title="Interogarea SQL"):
+    if not st.session_state.get("arata_sql"):
+        return
     with st.expander(f"🔎 {title}"):
         st.code(sql, language="sql")
         if params_:

@@ -7,15 +7,15 @@ from core.state import MODES
 st.set_page_config(page_title="SAD – Preț piese auto", page_icon="🔧", layout="wide")
 
 pages = {
-    "": [st.Page("views/home.py", title="Acasă", icon="🏠", default=True)],
+    "": [st.Page("views/home.py", title="Panou general", icon="🏠", default=True)],
     "Modele decizionale": [
-        st.Page("views/decizie.py", title="1. Prețul de vânzare", icon="🏷️"),
-        st.Page("views/vanzari.py", title="2. Vânzări și prognoză", icon="📈"),
-        st.Page("views/simulare.py", title="3. Simulare reducere / creștere", icon="🎚️"),
+        st.Page("views/decizie.py", title="Preț de vânzare", icon="🏷️"),
+        st.Page("views/vanzari.py", title="Vânzări și prognoză", icon="📈"),
+        st.Page("views/simulare.py", title="Simulare preț", icon="🎚️"),
     ],
-    "Rapoarte (Tema 2)": [
+    "Rapoarte": [
         st.Page("views/harta.py", title="Hartă comenzi", icon="🗺️"),
-        st.Page("views/rapoarte.py", title="Exporturi Excel / PDF", icon="📄"),
+        st.Page("views/rapoarte.py", title="Export Excel / PDF", icon="📄"),
     ],
     "Date": [
         st.Page("views/surse.py", title="Surse de date", icon="🗂️"),
@@ -25,7 +25,7 @@ pages = {
 nav = st.navigation(pages)
 
 with st.sidebar:
-    st.markdown("### ⚙️ Parametri globali")
+    st.markdown("### ⚙️ Setări")
     st.radio("Sursa datelor", list(MODES), key="sursa")
     if MODES[st.session_state["sursa"]] == "upload":
         ups = {}
@@ -34,11 +34,9 @@ with st.sidebar:
         st.session_state["uploads"] = ups
     else:
         st.session_state["uploads"] = {}
-    st.number_input("Marja dorită (%)", 0, 300, 30, 1, key="marja",
-                    help="Ca celula B3 din foaia Decizie")
-    st.multiselect("Magazine concurente luate în calcul", ["Magazin A", "Magazin B", "Magazin C"],
+    st.number_input("Marja dorită (%)", 0, 300, 30, 1, key="marja")
+    st.multiselect("Magazine concurente", ["Magazin A", "Magazin B", "Magazin C"],
                    default=["Magazin A", "Magazin B", "Magazin C"], key="magazine")
-    st.divider()
-    st.caption("SAD · master SIA · FEAA UAIC")
+    st.toggle("Arată interogările SQL", value=False, key="arata_sql")
 
 nav.run()
