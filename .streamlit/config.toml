@@ -1,7 +1,27 @@
 [theme]
-primaryColor = "#2563eb"
 base = "light"
+primaryColor = "#2563eb"
+backgroundColor = "#f4f6fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
 font = "sans serif"
+baseRadius = "0.6rem"
+borderColor = "#e2e8f0"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#f1f5f9"
+headingFontWeights = [800, 700, 700, 600, 600, 600]
+chartCategoricalColors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2"]
+greenColor = "#16a34a"
+redColor = "#dc2626"
+
+[theme.sidebar]
+backgroundColor = "#0f172a"
+secondaryBackgroundColor = "#1e293b"
+textColor = "#e2e8f0"
+borderColor = "#334155"
 
 [server]
 maxUploadSize = 50
+
+[client]
+toolbarMode = "viewer"

@@ -1,37 +1,38 @@
-"""SAD – stabilirea prețului de vânzare pentru piese auto (prototip Streamlit)."""
+"""PrețPiese – sistem de asistare a deciziilor pentru prețul pieselor auto."""
 import streamlit as st
 
 from core.db import SOURCE_LABELS
 from core.state import MODES
+from core.ui import setup
 
-st.set_page_config(page_title="SAD – Preț piese auto", page_icon="🔧", layout="wide")
+st.set_page_config(page_title="PrețPiese – SAD", page_icon="assets/icon.svg", layout="wide")
+st.logo("assets/logo.svg", size="large", icon_image="assets/icon.svg")
+setup()
 
 pages = {
-    "": [st.Page("views/home.py", title="Panou general", icon="🏠", default=True)],
-    "Modele decizionale": [
-        st.Page("views/decizie.py", title="Preț de vânzare", icon="🏷️"),
-        st.Page("views/vanzari.py", title="Vânzări și prognoză", icon="📈"),
-        st.Page("views/simulare.py", title="Simulare preț", icon="🎚️"),
+    "": [st.Page("views/home.py", title="Panou general", icon=":material/dashboard:", default=True)],
+    "Decizii": [
+        st.Page("views/decizie.py", title="Preț de vânzare", icon=":material/sell:"),
+        st.Page("views/vanzari.py", title="Vânzări și prognoză", icon=":material/trending_up:"),
+        st.Page("views/simulare.py", title="Simulare preț", icon=":material/tune:"),
     ],
     "Rapoarte": [
-        st.Page("views/harta.py", title="Hartă comenzi", icon="🗺️"),
-        st.Page("views/rapoarte.py", title="Export Excel / PDF", icon="📄"),
+        st.Page("views/harta.py", title="Hartă comenzi", icon=":material/public:"),
+        st.Page("views/rapoarte.py", title="Export Excel / PDF", icon=":material/download:"),
     ],
     "Date": [
-        st.Page("views/surse.py", title="Surse de date", icon="🗂️"),
-        st.Page("views/sql.py", title="Interogări SQL", icon="🧮"),
+        st.Page("views/surse.py", title="Surse de date", icon=":material/database:"),
+        st.Page("views/sql.py", title="Interogări SQL", icon=":material/terminal:"),
     ],
 }
 nav = st.navigation(pages)
 
 with st.sidebar:
-    st.markdown("### ⚙️ Setări")
-    st.radio("Sursa datelor", list(MODES), key="sursa")
+    st.markdown("**SETĂRI**")
+    st.selectbox("Sursa datelor", list(MODES), key="sursa")
     if MODES[st.session_state["sursa"]] == "upload":
-        ups = {}
-        for key, label in SOURCE_LABELS.items():
-            ups[key] = st.file_uploader(label, type=["csv", "xlsx"], key=f"up_{key}")
-        st.session_state["uploads"] = ups
+        st.session_state["uploads"] = {key: st.file_uploader(label, type=["csv", "xlsx"], key=f"up_{key}")
+                                       for key, label in SOURCE_LABELS.items()}
     else:
         st.session_state["uploads"] = {}
     st.number_input("Marja dorită (%)", 0, 300, 30, 1, key="marja")

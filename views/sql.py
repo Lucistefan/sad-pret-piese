@@ -4,8 +4,9 @@ import streamlit as st
 
 from core.db import q, schema
 from core.state import get_con
+from core.ui import header
 
-st.title("🧮 Interogări SQL")
+header("🧮", "Interogări SQL", "Interogări libere pe baza de date a aplicației")
 
 con, tables, log = get_con()
 st.dataframe(schema(con), hide_index=True)

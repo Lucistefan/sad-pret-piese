@@ -7,9 +7,9 @@ de date și formule, plus extensii și exporturile cerute la Tema 2.
 
 | Pagină | Ce conține |
 |---|---|
-| 1. Prețul de vânzare | cost + marjă vs. media concurenței (foaia Decizie), preț recomandat cu marjă minimă, marja maximă competitivă, filtre pe categorie / marcă / magazine, **SQL dinamic** afișat |
-| 2. Vânzări și prognoză | FORECAST (trend liniar) sau medie mobilă, orizont 1–6 luni, R², luni max/min, tipuri de clienți |
-| 3. Simulare | aceeași elasticitate ca în foaia Simulare (Mult / Mediu / Puțin), plus efectul asupra **profitului** și modificarea optimă |
+| Preț de vânzare | cost + marjă vs. media concurenței (foaia Decizie), preț recomandat cu marjă minimă, marja maximă competitivă, filtre pe categorie / marcă / magazine, **SQL dinamic** afișat |
+| Vânzări și prognoză | FORECAST (trend liniar) sau medie mobilă, orizont 1–6 luni, R², luni max/min, tipuri de clienți |
+| Simulare preț | aceeași elasticitate ca în foaia Simulare (Mult / Mediu / Puțin), plus efectul asupra **profitului** și modificarea optimă |
 | Hartă comenzi | cartodiagramă (choropleth + cercuri proporționale), export PNG și HTML |
 | Exporturi Excel / PDF | Excel cu 9 foi formatate și 4 grafice native, raport PDF de 4 pagini, CSV |
 | Surse de date | copie locală / Google Sheets live / fișiere încărcate → bază SQLite |
@@ -21,6 +21,19 @@ prognoză 60 / 85 / 34 / 12 / 191, simulare −50% → −5869 lei.
 **Diferență intenționată:** în foaia Decizie, `AVERAGE(VLOOKUP(...;{2,3,4};0))` fără ARRAYFORMULA întoarce doar
 prețul de la Magazin A. Aplicația calculează media reală a magazinelor bifate. Dacă bifezi doar Magazin A, obții
 exact valorile din foaie.
+
+## Cerințe acoperite (fișa disciplinei SAD, până la Tema 2)
+
+| Cerință | Unde în aplicație |
+|---|---|
+| Grafice și grid-uri | toate paginile (Plotly + tabele interactive) |
+| Cel puțin 2 surse de date | 3 surse: Furnizor, Prețuri concurență, Vânzări; citite din Google Sheets (live), din fișierele locale sau din fișiere încărcate (CSV/Excel), apoi încărcate în SQLite |
+| Cel puțin 2 modele decizionale | 3 modele: preț cost + marjă vs. piață; prognoză (trend liniar / medie mobilă); simulare cu elasticitate |
+| Interogări SQL dinamice | construite din controale (categorie, marcă, magazine, marjă, minim comenzi); vizibile cu comutatorul „Arată interogările SQL”; consolă SQL |
+| Controale care modifică conținutul | filtre, slidere, selecții în fiecare pagină; setările din bara laterală se aplică peste tot |
+| **Tema 2 – export .xlsx** | raport Excel cu 9 foi, formatare condiționată, formule și grafice; export Excel pe fiecare pagină |
+| **Tema 2 – export .pdf** | raport PDF de 4 pagini cu tabele, grafice, concluzii și hartă |
+| **Tema 2 – cartodiagrame / hărți** | pagina Hartă comenzi (choropleth + cercuri proporționale), export PNG / HTML, hartă inclusă în PDF |
 
 ## Rulare locală
 ```bash

@@ -284,10 +284,10 @@ def raport_pdf(ctx: dict) -> bytes:
     pdf.table(t, widths=[26, 20, 20, 18, 27, 27, 26, 26], size=8,
               highlight=lambda r: (220, 252, 231) if r["Δ încasări"] > 0 else (254, 226, 226))
     tot = sim["castig_pierdere"].sum()
+    prof = sim["dif_profit"].sum()
     pdf.ln(1)
-    pdf.p(("Concluzie: pe total câștigi " if tot > 0 else "Concluzie: pe total pierzi ")
-          + f"{abs(tot):,.0f} lei din încasări – modificarea "
-          + ("ESTE" if tot > 0 else "NU este") + f" recomandată. Efect asupra profitului: {sim['dif_profit'].sum():+,.0f} lei.", 9.5)
+    pdf.p(("Concluzie: MERITĂ. " if prof > 0 else "Concluzie: NU merită. ")
+          + f"Profitul se modifică cu {prof:+,.0f} lei, iar încasările cu {tot:+,.0f} lei.", 9.5)
     pdf.image_bytes(chart_simulare(ctx["curba"], ctx["modificare"]))
     pdf.p(f"Modificarea care maximizează încasările totale: {ctx['opt_incasari']:+d}%. "
           f"Modificarea care maximizează profitul total: {ctx['opt_profit']:+d}%.", 9)
