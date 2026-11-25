@@ -1,0 +1,16 @@
+Nr,Luna,Frane,Filtre,Suspensie,Ambreiaj,Total,,Cod tara,Tara,Comenzi,,Tip client,Comenzi,Valoare (lei)
+1,Noiembrie,39,55,20,8,122,,FR,Franta,186,,Persoane fizice,412,58200
+2,Decembrie,39,38,21,7,105,,RO,Romania,142,,Service-uri auto,186,61400
+3,Ianuarie,35,35,27,6,103,,BE,Belgia,64,,Firme cu flote auto,47,23800
+4,Februarie,40,43,32,7,122,,DE,Germania,58
+5,Martie,48,83,44,10,185,,IT,Italia,52
+6,Aprilie,54,85,49,11,199,,ES,Spania,47
+7,Mai,50,70,39,10,169,,NL,Olanda,33
+8,Iunie,51,68,31,10,160,,CH,Elvetia,29
+9,Iulie,48,63,26,9,146,,PT,Portugalia,25
+10,August,53,61,24,10,148,,LU,Luxemburg,21
+11,Septembrie,56,75,30,11,172,,AT,Austria,18
+12,Octombrie,59,89,33,13,194,,MD,Moldova,16
+,,,,,,,,PL,Polonia,14
+,,,,,,,,HU,Ungaria,12
+,,,,,,,,BG,Bulgaria,10

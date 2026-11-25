@@ -1,0 +1,21 @@
+Cod,Denumire,Categorie,Marca,Pret achizitie,Transport
+FR-101,Plăcuțe frână față,Frâne,Bosch,85,15
+FR-102,Plăcuțe frână spate,Frâne,ATE,70,15
+FR-103,Disc frână față,Frâne,Brembo,140,20
+FR-104,Disc frână spate,Frâne,TRW,115,20
+FR-105,Lichid frână 1L,Frâne,ATE,32,10
+FI-201,Filtru ulei,Filtre,Mann,28,8
+FI-202,Filtru aer,Filtre,Mann,45,8
+FI-203,Filtru polen,Filtre,Bosch,38,8
+FI-204,Filtru combustibil,Filtre,Mahle,62,10
+FI-205,Filtru habitaclu carbon,Filtre,Mahle,55,8
+SU-301,Amortizor față,Suspensie,Sachs,210,25
+SU-302,Amortizor spate,Suspensie,Monroe,180,25
+SU-303,Bieletă antiruliu,Suspensie,Lemförder,48,10
+SU-304,Braț suspensie,Suspensie,TRW,165,20
+SU-305,Rulment roată,Suspensie,SKF,120,15
+AM-401,Kit ambreiaj,Ambreiaj,LuK,520,35
+AM-402,Rulment presiune,Ambreiaj,Valeo,145,15
+AM-403,Volantă,Ambreiaj,LuK,980,45
+AM-404,Cilindru receptor,Ambreiaj,Valeo,130,15
+AM-405,Cablu ambreiaj,Ambreiaj,Sachs,75,10
