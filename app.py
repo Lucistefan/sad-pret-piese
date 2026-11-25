@@ -2,7 +2,7 @@
 import streamlit as st
 
 from core.db import SOURCE_LABELS
-from core.state import MODES
+from core.state import MODES, reload_data
 from core.ui import setup
 
 st.set_page_config(page_title="PrețPiese – SAD", page_icon="assets/icon.svg", layout="wide")
@@ -30,6 +30,8 @@ nav = st.navigation(pages)
 with st.sidebar:
     st.markdown("**SETĂRI**")
     st.selectbox("Sursa datelor", list(MODES), key="sursa")
+    if MODES[st.session_state["sursa"]] == "google":
+        st.button("Reîncarcă datele", icon=":material/refresh:", on_click=reload_data, width="stretch")
     if MODES[st.session_state["sursa"]] == "upload":
         st.session_state["uploads"] = {key: st.file_uploader(label, type=["csv", "xlsx"], key=f"up_{key}")
                                        for key, label in SOURCE_LABELS.items()}

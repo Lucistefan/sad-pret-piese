@@ -10,13 +10,17 @@ import streamlit as st
 from core.db import CATEGORII, load_all, make_db, q
 from core.models import (ELASTICITATE, REACTIE_IMPLICITA, curba_simulare, decizie, marja_pe_categorie, prognoza, simulare)
 
-MODES = {"Copie locală (fișierele echipei)": "local", "Google Sheets (live)": "google",
+MODES = {"Google Sheets (live)": "google", "Copie locală (fișierele echipei)": "local",
          "Încarc fișierele mele": "upload"}
 
 
-@st.cache_data(ttl=300, show_spinner="Încarc sursele de date…")
+@st.cache_data(ttl=60, show_spinner="Încarc sursele de date…")
 def _load(mode: str, upload_sig: str, _uploads):
     return load_all(mode, _uploads)
+
+
+def reload_data():
+    _load.clear()
 
 
 def get_con():
