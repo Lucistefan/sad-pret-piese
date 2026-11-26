@@ -5,7 +5,7 @@ from core.db import CATEGORII, q
 from core.models import decizie
 from core.state import get_con, sql_box
 from core.ui import (card, filtre_active, filtru_multi, grafic, header, pozitie_badge, reset_filtre, sau_toate,
-                     style_fig, verdict_badge, xlsx_bytes)
+                     style_fig, verdict_badge, xlsx_export)
 
 EXPLICATIE = """
 **Ce decide pagina:** ce preț de vânzare pun pe fiecare piesă.
@@ -120,8 +120,18 @@ with card("Prețuri"):
         "marja_realizata_%": st.column_config.ProgressColumn("Marjă recomandată", format="%.1f%%", min_value=0,
                                                               max_value=max(60.0, float(df["marja_realizata_%"].max()))),
         "pozitie_piata": "Poziție pe piață"})
-    st.download_button("⬇️ Exportă tabelul (Excel)", xlsx_bytes(df, "Decizie pret"), "decizie_pret.xlsx",
-                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    exp = df[["cod", "denumire", "marca", "categorie", "cost_total", "pret_propus", "media_concurenta",
+              "min_concurenta", "max_concurenta", "recomandare", "pret_recomandat", "marja_realizata_%",
+              "marja_max_competitiva_%", "pozitie_piata"]].copy()
+    exp["dif_fata_de_piata_%"] = ((exp["pret_propus"] / exp["media_concurenta"] - 1) * 100).round(1)
+    if tip == "Diferență față de piață":
+        g = {"tip": "Coloane", "x": "cod", "y": ["dif_fata_de_piata_%"], "titlu": "Preț propus față de media pieței (%)",
+             "axa": "%"}
+    else:
+        g = {"tip": "Coloane", "x": "cod", "y": ["cost_total", "pret_propus", "media_concurenta", "pret_recomandat"],
+             "titlu": f"Cost, preț propus ({marja}%), media pieței, preț recomandat", "axa": "lei"}
+    st.download_button("⬇️ Exportă tabelul și graficul (Excel)", xlsx_export([("Decizie pret", exp, g, None)]),
+                       "decizie_pret.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 with card("Detaliu piesă"):
     cod = st.selectbox("Piesa", df["cod"] + " – " + df["denumire"], label_visibility="collapsed")

@@ -11,7 +11,7 @@ EXPLICATIE = """
 **Ce conține raportul:** aceleași calcule ca în aplicație, pentru categoriile și parametrii aleși aici.
 
 - **Excel (.xlsx):** 9 foi: prețuri, piață, prognoză, simulare, comenzi pe țări, clienți etc.
-  Are formatare condiționată (roșu/verde), formule `SUM` și grafice native Excel.
+  Are formatare condiționată (roșu/verde), formule `SUM`, grafice native Excel pe fiecare foaie și harta comenzilor ca imagine.
 - **PDF:** raport de 4 pagini cu tabele, grafice, harta comenzilor și concluzia.
 - **CSV:** lista de prețuri recomandate, ca să poată fi importată în magazinul online.
 
@@ -42,7 +42,7 @@ a, b, c = st.columns(3)
 with a:
     with card():
         st.markdown("#### 📊 Excel")
-        st.caption("9 foi, formatare condiționată, grafice")
+        st.caption("9 foi, cu grafice native și hartă")
         st.download_button("Descarcă .xlsx", xlsx, f"raport_pret_piese_{stamp}.xlsx",
                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary",
                            width="stretch")

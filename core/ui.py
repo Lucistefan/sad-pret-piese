@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 
 import pandas as pd
+from openpyxl.utils import get_column_letter
 import plotly.express as px
 import streamlit as st
 
@@ -162,11 +163,72 @@ def pozitie_badge(v: str) -> str:
 
 
 def xlsx_bytes(df: pd.DataFrame, sheet="Date") -> bytes:
+    return xlsx_export([(sheet, df, None, None)])
+
+
+def _grafic_excel(ws, df, g):
+    """Grafic nativ Excel (se poate edita în Excel), de același tip cu cel ales pe ecran."""
+    from openpyxl.chart import AreaChart, BarChart, LineChart, PieChart, Reference
+
+    tip = g.get("tip", "Coloane")
+    cols = list(df.columns)
+    n = g.get("randuri", len(df))          # câte rânduri intră în grafic (ex. fără rândul Total)
+    if tip == "Plăcintă":
+        ch = PieChart()
+    elif tip in ("Linii",):
+        ch = LineChart()
+    elif tip == "Arie":
+        ch = AreaChart()
+        ch.grouping = "stacked"
+    else:
+        ch = BarChart()
+        ch.type = "bar" if tip == "Bare orizontale" else "col"
+        if tip == "Coloane stivuite":
+            ch.grouping, ch.overlap = "stacked", 100
+    ch.title = g.get("titlu")
+    if tip != "Plăcintă":
+        ch.y_axis.title = g.get("axa")
+        ch.y_axis.delete = False
+        ch.x_axis.delete = False
+    ch.height, ch.width = g.get("inaltime", 9), g.get("latime", 20)
+    ys = g["y"] if tip != "Plăcintă" else g["y"][:1]
+    for y in ys:
+        k = cols.index(y) + 1
+        ch.add_data(Reference(ws, min_col=k, min_row=1, max_row=n + 1), titles_from_data=True)
+    if tip == "Linii":
+        for ser in ch.series:
+            ser.smooth = False
+    if len(ys) == 1 and tip != "Plăcintă":
+        ch.legend = None
+    kx = cols.index(g["x"]) + 1
+    ch.set_categories(Reference(ws, min_col=kx, min_row=2, max_row=n + 1))
+    ws.add_chart(ch, g.get("pozitie") or f"{get_column_letter(len(cols) + 2)}2")
+
+
+def xlsx_export(foi) -> bytes:
+    """Excel cu mai multe foi. Fiecare foaie = (nume, tabel, grafic | None, imagine PNG | None).
+
+    grafic = {"tip": "Coloane"|"Coloane stivuite"|"Bare orizontale"|"Linii"|"Arie"|"Plăcintă",
+              "x": coloana de categorii, "y": [coloane de valori], "titlu": ..., "axa": ...}
+    """
+    from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.styles import Font, PatternFill
+
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
-        df.to_excel(w, sheet_name=sheet, index=False)
-        ws = w.book[sheet]
-        for i, col in enumerate(df.columns, 1):
-            width = max(len(str(col)), *(len(str(v)) for v in df[col].head(100))) + 2
-            ws.column_dimensions[ws.cell(1, i).column_letter].width = min(width, 40)
+        for nume, df, g, img in foi:
+            df.to_excel(w, sheet_name=nume, index=False)
+            ws = w.book[nume]
+            for i, col in enumerate(df.columns, 1):
+                width = max(len(str(col)), *(len(str(v)) for v in df[col].head(100))) + 2
+                ws.column_dimensions[get_column_letter(i)].width = min(width, 40)
+                c = ws.cell(1, i)
+                c.font, c.fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor="2563EB")
+            ws.freeze_panes = "A2"
+            if g:
+                _grafic_excel(ws, df, g)
+            if img:
+                pic = XLImage(io.BytesIO(img))
+                pic.width, pic.height = pic.width * 0.55, pic.height * 0.55
+                ws.add_image(pic, f"{get_column_letter(len(df.columns) + 2)}{22 if g else 2}")
     return buf.getvalue()

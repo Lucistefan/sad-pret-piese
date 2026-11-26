@@ -3,7 +3,7 @@ import streamlit as st
 from core.db import q
 from core.reports import map_plotly, map_png
 from core.state import get_con, sql_box
-from core.ui import card, filtre_active, filtru_multi, grafic, header, reset_filtre, xlsx_bytes
+from core.ui import card, filtre_active, filtru_multi, grafic, header, reset_filtre, xlsx_export
 
 EXPLICATIE = """
 **Ce arată pagina:** în ce țări se vând piesele (numărul de comenzi pe țară, din sursa Vânzări).
@@ -60,7 +60,9 @@ with card():
     d1.download_button("⬇️ Hartă PNG", map_png(tari), "harta_comenzi.png", "image/png", width="stretch")
     d2.download_button("⬇️ Hartă HTML", fig.to_html(include_plotlyjs="cdn"), "harta_comenzi.html", "text/html",
                        width="stretch")
-    d3.download_button("⬇️ Date Excel", xlsx_bytes(tari, "Comenzi pe tari"), "comenzi_tari.xlsx", width="stretch")
+    d3.download_button("⬇️ Excel (date, grafic, hartă)", xlsx_export([("Comenzi pe tari", tari, {"tip": "Bare orizontale", "x": "tara", "y": ["comenzi"],
+                                                             "titlu": "Comenzi pe țări", "axa": "comenzi",
+                                                             "inaltime": 10, "latime": 14}, map_png(tari))]), "comenzi_tari.xlsx", width="stretch")
 
 a, b = st.columns([3, 2])
 with a:

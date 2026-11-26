@@ -14,7 +14,8 @@ import pandas as pd  # noqa: E402
 from fpdf import FPDF  # noqa: E402
 from matplotlib.collections import PatchCollection  # noqa: E402
 from matplotlib.patches import Polygon  # noqa: E402
-from openpyxl.chart import BarChart, LineChart, Reference  # noqa: E402
+from openpyxl.chart import BarChart, LineChart, PieChart, Reference  # noqa: E402
+from openpyxl.drawing.image import Image as XLImage  # noqa: E402
 from openpyxl.formatting.rule import CellIsRule  # noqa: E402
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
@@ -396,9 +397,10 @@ def raport_excel(ctx: dict) -> bytes:
             c = ws.cell(r, k, f"=SUM({L}2:{L}{r - 1})")   # formulă Excel reală, nu valoare
             c.font, c.number_format = Font(bold=True), '#,##0 "lei"'
         bc = BarChart()
-        bc.title, bc.height, bc.width = "Câștig / pierdere din modificarea prețului", 7, 16
-        k = list(sim.columns).index("castig_pierdere") + 1
-        bc.add_data(Reference(ws, min_col=k, min_row=1, max_row=len(sim) + 1), titles_from_data=True)
+        bc.title, bc.height, bc.width = "Diferența de încasări și de profit", 8, 18
+        for name in ["castig_pierdere", "dif_profit"]:
+            k = list(sim.columns).index(name) + 1
+            bc.add_data(Reference(ws, min_col=k, min_row=1, max_row=len(sim) + 1), titles_from_data=True)
         bc.set_categories(Reference(ws, min_col=1, min_row=2, max_row=len(sim) + 1))
         ws.add_chart(bc, f"A{r + 3}")
 
@@ -409,6 +411,37 @@ def raport_excel(ctx: dict) -> bytes:
         bc.add_data(Reference(ws, min_col=k, min_row=1, max_row=len(ctx["tari"]) + 1), titles_from_data=True)
         bc.set_categories(Reference(ws, min_col=2, min_row=2, max_row=len(ctx["tari"]) + 1))
         ws.add_chart(bc, "G2")
+        pic = XLImage(io.BytesIO(map_png(ctx["tari"])))       # harta (cartodiagrama) ca imagine
+        pic.width, pic.height = pic.width * 0.5, pic.height * 0.5
+        ws.add_image(pic, "G22")
+
+        ws = wb["Prognoza"]
+        det = ctx["prognoza_det"]
+        n = len(det) - 1 if det["categorie"].iloc[-1] == "Total" else len(det)
+        bc = BarChart()
+        bc.title, bc.y_axis.title, bc.height, bc.width = "Prognoza pe luna următoare", "buc", 8, 16
+        k = list(det.columns).index("prognoza_luna_urm") + 1
+        bc.add_data(Reference(ws, min_col=k, min_row=1, max_row=n + 1), titles_from_data=True)
+        bc.set_categories(Reference(ws, min_col=1, min_row=2, max_row=n + 1))
+        ws.add_chart(bc, f"A{len(det) + 4}")
+
+        ws = wb["Clienti"]
+        cl = ctx["clienti"]
+        pc = PieChart()
+        pc.title, pc.height, pc.width = "Valoarea comenzilor pe tip de client", 8, 12
+        k = list(cl.columns).index("valoare") + 1
+        pc.add_data(Reference(ws, min_col=k, min_row=1, max_row=len(cl) + 1), titles_from_data=True)
+        pc.set_categories(Reference(ws, min_col=1, min_row=2, max_row=len(cl) + 1))
+        ws.add_chart(pc, "F2")
+
+        ws = wb["Curba simulare"]
+        lc = LineChart()
+        lc.title, lc.y_axis.title, lc.x_axis.title = "Diferența de încasări după modificarea prețului", "lei", "modificare %"
+        lc.height, lc.width = 9, 18
+        lc.add_data(Reference(ws, min_col=2, max_col=curba_w.shape[1], min_row=1, max_row=len(curba_w) + 1),
+                    titles_from_data=True)
+        lc.set_categories(Reference(ws, min_col=1, min_row=2, max_row=len(curba_w) + 1))
+        ws.add_chart(lc, f"{get_column_letter(curba_w.shape[1] + 2)}2")
     return buf.getvalue()
 
 

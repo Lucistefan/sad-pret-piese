@@ -5,7 +5,7 @@ import streamlit as st
 from core.db import CATEGORII
 from core.models import ELASTICITATE, REACTIE_IMPLICITA, curba_simulare, marja_pe_categorie, prognoza, simulare
 from core.state import get_con, sql_box
-from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_bytes
+from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_export
 
 EXPLICATIE = """
 **Întrebarea:** dacă schimb prețul cu X%, câștig sau pierd bani?
@@ -105,7 +105,6 @@ with card("Pe categorii"):
         fig = grafic(long, "categorie", "lei", tip, color="indicator", height=340,
                      color_map={"Δ încasări": "#94a3b8", "Δ profit": "#2563eb"}, labels={"categorie": ""})
         st.plotly_chart(fig)
-    st.download_button("⬇️ Exportă simularea (Excel)", xlsx_bytes(sim, "Simulare"), "simulare.xlsx")
     sql_box(sqlp, {"marja": marja})
 
 curba = curba_simulare(prog, preturi, costuri, reactii, elasticitate=elast)
@@ -134,3 +133,13 @@ with card("Modificarea optimă"):
     st.dataframe(opt, hide_index=True, column_config={
         "Optim profit": st.column_config.NumberColumn(format="%+d%%"),
         "Optim încasări": st.column_config.NumberColumn(format="%+d%%")})
+    curba_w = curba.pivot_table(index="modificare_%", columns="categorie", values=col).reset_index()
+    curba_w["Total"] = curba_w[cats].sum(axis=1)
+    curba_w.columns.name = None
+    st.download_button("⬇️ Exportă simularea și graficele (Excel)", xlsx_export([
+        ("Simulare", sim, {"tip": "Coloane" if tip == "Tabel" else tip, "x": "categorie",
+                           "y": ["castig_pierdere", "dif_profit"], "titlu": f"Efectul modificării de {mod:+d}%",
+                           "axa": "lei"}, None),
+        ("Curba", curba_w, {"tip": "Linii", "x": "modificare_%", "y": [*cats, "Total"],
+                            "titlu": f"Diferență {ind.lower()} după modificarea prețului", "axa": "lei"}, None),
+        ("Optim", opt, None, None)]), "simulare.xlsx")
