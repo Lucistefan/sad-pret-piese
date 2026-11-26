@@ -5,22 +5,42 @@ import streamlit as st
 from core.db import CATEGORII
 from core.models import ELASTICITATE, REACTIE_IMPLICITA, curba_simulare, marja_pe_categorie, prognoza, simulare
 from core.state import get_con, sql_box
-from core.ui import PAL, card, header, style_fig, xlsx_bytes
+from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_bytes
+
+EXPLICATIE = """
+**Întrebarea:** dacă schimb prețul cu X%, câștig sau pierd bani?
+
+1. **Vânzări estimate** = prognoza pe luna următoare (din pagina Vânzări).
+2. **Elasticitatea** spune cât de tare reacționează clienții la preț:
+   - *Mult* (−1,5): la 10% reducere vinzi cu 15% mai mult (ex. filtre, frâne: clienții compară prețurile);
+   - *Mediu* (−1,0): la 10% reducere vinzi cu 10% mai mult;
+   - *Puțin* (−0,5): la 10% reducere vinzi doar cu 5% mai mult (ex. ambreiaj: piesă urgentă, o cumperi oricum).
+3. **Vânzări după** = vânzări estimate × (1 + coeficient × modificare%).
+4. **Încasări** = bucăți × preț. **Profit** = bucăți × (preț − cost).
+
+**Verdictul se dă după profit:** o reducere poate aduce mai mulți bani încasați, dar mai puțin profit,
+pentru că pe fiecare piesă câștigi mai puțin.
+
+Coeficienții sunt estimări pe tipul de piesă și se pot modifica mai jos.
+"""
 
 
 def lei(x):
     return f"{x:,.0f} lei".replace(",", ".")
 
 
-header("🎚️", "Simulare preț", "Merită o reducere sau o creștere de preț?")
+header("🎚️", "Simulare preț", "Merită o reducere sau o creștere de preț?", EXPLICATIE)
 
 con, tables, log = get_con()
 marja = st.session_state.get("marja", 30)
 
 with card():
-    mod = st.slider("Modificare preț (%)", -50, 50, int(st.session_state.get("modificare", -10)), 1,
-                    format="%+d%%")
+    c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+    mod = c1.slider("Modificare preț (%)", -50, 50, int(st.session_state.get("modificare", -10)), 1, format="%+d%%")
     st.session_state["modificare"] = mod
+    with c2.popover("Filtre", icon=":material/filter_list:", width="stretch"):
+        f_cat = filtru_multi(st, "Categorie", CATEGORII, "fs_cat")
+        st.button("Resetează filtrele", on_click=reset_filtre, args=("fs_",), icon=":material/restart_alt:")
     with st.expander("Sensibilitatea clienților la preț"):
         cols = st.columns(4)
         reactii = {}
@@ -33,44 +53,58 @@ with card():
         elast = {k: e_cols[i].number_input(f"Coeficient «{k}»", -5.0, 0.0, float(saved[k]), 0.1)
                  for i, k in enumerate(ELASTICITATE)}
         st.session_state["elast"] = elast
+filtre_active({"Categorie": f_cat})
+cats = f_cat or CATEGORII
 
 _, _, det, _ = prognoza(con, 1)
 pc, sqlp = marja_pe_categorie(con, marja)
 dd = det.set_index("categorie")
-prog = {c: int(dd.loc[c, "prognoza_luna_urm"]) for c in CATEGORII}
-preturi = {c: float(pc.loc[c, "pret_actual"]) for c in CATEGORII}
-costuri = {c: float(pc.loc[c, "cost_mediu"]) for c in CATEGORII}
+prog = {c: int(dd.loc[c, "prognoza_luna_urm"]) for c in cats}
+preturi = {c: float(pc.loc[c, "pret_actual"]) for c in cats}
+costuri = {c: float(pc.loc[c, "cost_mediu"]) for c in cats}
 
 sim = simulare(prog, preturi, costuri, reactii, mod, elast)
 tot_inc = float(sim["castig_pierdere"].sum())
 tot_prof = float(sim["dif_profit"].sum())
 buc_acum, buc_dupa = int(sim["vanzari_estimate"].sum()), int(sim["vanzari_dupa"].sum())
 
-# Verdict unic, după profit (ce rămâne după plata furnizorului)
 if mod == 0:
     st.info("Alege o modificare de preț.")
 elif tot_prof > 0:
-    st.success(f"**Merită.** Profitul crește cu {lei(tot_prof)} (încasările se modifică cu {tot_inc:+,.0f} lei).".replace(",", "."))
+    st.success(f"**Merită.** Profitul crește cu {lei(tot_prof)} (încasările se modifică cu {tot_inc:+,.0f} lei)."
+               .replace(",", "."))
 else:
     st.error(f"**Nu merită.** Profitul scade cu {lei(-tot_prof)}"
              + (f", chiar dacă încasările cresc cu {lei(tot_inc)}." if tot_inc > 0 else f", iar încasările scad cu {lei(-tot_inc)}."))
 
 k = st.columns(4)
-k[0].metric("Piese vândute", f"{buc_dupa} buc", f"{buc_dupa - buc_acum:+d} buc")
-k[1].metric("Încasări", lei(sim["incasari_dupa"].sum()), f"{tot_inc:+,.0f} lei".replace(",", "."))
-k[2].metric("Profit", lei(sim["profit_dupa"].sum()), f"{tot_prof:+,.0f} lei".replace(",", "."))
+k[0].metric("Piese vândute", f"{buc_dupa} buc", f"{buc_dupa - buc_acum:+d} buc", help="Estimare după modificarea prețului")
+k[1].metric("Încasări", lei(sim["incasari_dupa"].sum()), f"{tot_inc:+,.0f} lei".replace(",", "."),
+            help="Bucăți × preț")
+k[2].metric("Profit", lei(sim["profit_dupa"].sum()), f"{tot_prof:+,.0f} lei".replace(",", "."),
+            help="Bucăți × (preț − cost)")
 k[3].metric("Profit înainte", lei(sim["profit_acum"].sum()))
 
 with card("Pe categorii"):
-    t = sim[["categorie", "reactie_clienti", "pret_actual", "vanzari_estimate", "vanzari_dupa", "castig_pierdere",
-             "dif_profit"]].copy()
-    t["verdict"] = t["dif_profit"].apply(lambda v: "🟢 merită" if v > 0 else "🔴 nu merită")
-    leicol = lambda x: st.column_config.NumberColumn(x, format="%+d lei")  # noqa: E731
-    st.dataframe(t, hide_index=True, column_config={
-        "categorie": "Categorie", "reactie_clienti": "Sensibilitate",
-        "pret_actual": st.column_config.NumberColumn("Preț actual", format="%d lei"),
-        "vanzari_estimate": "Buc. acum", "vanzari_dupa": "Buc. după",
-        "castig_pierdere": leicol("Δ încasări"), "dif_profit": leicol("Δ profit"), "verdict": "Verdict"})
+    tip = st.segmented_control("Tip grafic", ["Coloane", "Bare orizontale", "Tabel"], default="Coloane",
+                               key="g_sim", label_visibility="collapsed") or "Coloane"
+    if tip == "Tabel":
+        t = sim[["categorie", "reactie_clienti", "pret_actual", "vanzari_estimate", "vanzari_dupa", "castig_pierdere",
+                 "dif_profit"]].copy()
+        t["verdict"] = t["dif_profit"].apply(lambda v: "🟢 merită" if v > 0 else "🔴 nu merită")
+        leicol = lambda x: st.column_config.NumberColumn(x, format="%+d lei")  # noqa: E731
+        st.dataframe(t, hide_index=True, column_config={
+            "categorie": "Categorie", "reactie_clienti": "Sensibilitate",
+            "pret_actual": st.column_config.NumberColumn("Preț actual", format="%d lei"),
+            "vanzari_estimate": "Buc. acum", "vanzari_dupa": "Buc. după",
+            "castig_pierdere": leicol("Δ încasări"), "dif_profit": leicol("Δ profit"), "verdict": "Verdict"})
+    else:
+        long = sim.melt(id_vars="categorie", value_vars=["castig_pierdere", "dif_profit"], var_name="indicator",
+                        value_name="lei")
+        long["indicator"] = long["indicator"].map({"castig_pierdere": "Δ încasări", "dif_profit": "Δ profit"})
+        fig = grafic(long, "categorie", "lei", tip, color="indicator", height=340,
+                     color_map={"Δ încasări": "#94a3b8", "Δ profit": "#2563eb"}, labels={"categorie": ""})
+        st.plotly_chart(fig)
     st.download_button("⬇️ Exportă simularea (Excel)", xlsx_bytes(sim, "Simulare"), "simulare.xlsx")
     sql_box(sqlp, {"marja": marja})
 
@@ -81,7 +115,8 @@ best_i = tot.loc[tot["dif_incasari"].idxmax()]
 
 with card("Modificarea optimă"):
     c = st.columns([1, 1, 2])
-    c[0].metric("Cel mai mare profit", f"{int(best_p['modificare_%']):+d}%", f"{best_p['dif_profit']:+,.0f} lei".replace(",", "."))
+    c[0].metric("Cel mai mare profit", f"{int(best_p['modificare_%']):+d}%",
+                f"{best_p['dif_profit']:+,.0f} lei".replace(",", "."))
     c[1].metric("Cele mai mari încasări", f"{int(best_i['modificare_%']):+d}%",
                 f"{best_i['dif_incasari']:+,.0f} lei".replace(",", "."))
     ind = c[2].segmented_control("Grafic", ["Profit", "Încasări"], default="Profit") or "Profit"
@@ -95,7 +130,7 @@ with card("Modificarea optimă"):
     opt = pd.DataFrame([{"Categorie": cat, "Sensibilitate": reactii[cat],
                          "Optim profit": int(curba[curba["categorie"] == cat].set_index("modificare_%")["dif_profit"].idxmax()),
                          "Optim încasări": int(curba[curba["categorie"] == cat].set_index("modificare_%")["dif_incasari"].idxmax())}
-                        for cat in CATEGORII])
+                        for cat in cats])
     st.dataframe(opt, hide_index=True, column_config={
         "Optim profit": st.column_config.NumberColumn(format="%+d%%"),
         "Optim încasări": st.column_config.NumberColumn(format="%+d%%")})

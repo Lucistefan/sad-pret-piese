@@ -145,13 +145,92 @@ def load_all(mode: str, uploads: dict | None = None):
     return tables, log
 
 
+DDL = """
+-- nomenclator: categoriile de piese
+CREATE TABLE categorii (
+    categorie       TEXT PRIMARY KEY
+);
+-- sursa 1: Furnizor
+CREATE TABLE piese (
+    cod             TEXT PRIMARY KEY,
+    denumire        TEXT NOT NULL,
+    categorie       TEXT NOT NULL REFERENCES categorii(categorie),
+    marca           TEXT,
+    pret_achizitie  REAL NOT NULL CHECK (pret_achizitie >= 0),
+    transport       REAL NOT NULL DEFAULT 0
+);
+-- sursa 2: Prețuri concurență (o linie pentru fiecare piesă × magazin)
+CREATE TABLE preturi_concurenta (
+    cod             TEXT NOT NULL REFERENCES piese(cod),
+    magazin         TEXT NOT NULL,
+    pret            REAL NOT NULL CHECK (pret > 0),
+    PRIMARY KEY (cod, magazin)
+);
+-- sursa 3: Vânzări (3 tabele)
+CREATE TABLE vanzari_lunare (
+    nr              INTEGER NOT NULL,
+    luna            TEXT NOT NULL,
+    categorie       TEXT NOT NULL REFERENCES categorii(categorie),
+    bucati          INTEGER NOT NULL,
+    PRIMARY KEY (nr, categorie)
+);
+CREATE TABLE comenzi_tari (
+    cod_tara        TEXT PRIMARY KEY,
+    tara            TEXT NOT NULL,
+    iso3            TEXT,
+    comenzi         INTEGER NOT NULL
+);
+CREATE TABLE clienti (
+    tip_client      TEXT PRIMARY KEY,
+    comenzi         INTEGER NOT NULL,
+    valoare         REAL NOT NULL
+);
+CREATE INDEX ix_conc_cod ON preturi_concurenta(cod);
+CREATE INDEX ix_piese_categorie ON piese(categorie);
+-- vedere: costul total și media pieței pentru fiecare piesă
+CREATE VIEW v_piese_piata AS
+SELECT p.cod, p.denumire, p.categorie, p.marca,
+       p.pret_achizitie + p.transport AS cost_total,
+       ROUND(AVG(c.pret), 2) AS media_pietei,
+       MIN(c.pret) AS pret_minim, MAX(c.pret) AS pret_maxim,
+       COUNT(c.magazin) AS nr_magazine
+FROM piese p LEFT JOIN preturi_concurenta c ON c.cod = p.cod
+GROUP BY p.cod;
+"""
+
+# relațiile (pentru diagrama bazei de date)
+RELATII = [("piese", "categorie", "categorii", "categorie", "N:1"),
+           ("vanzari_lunare", "categorie", "categorii", "categorie", "N:1"),
+           ("preturi_concurenta", "cod", "piese", "cod", "N:1")]
+
+
 def make_db(tables: dict) -> sqlite3.Connection:
+    """Creează baza SQLite cu chei primare, chei străine și constrângeri, apoi încarcă datele."""
     con = sqlite3.connect(":memory:", check_same_thread=False)
+    con.executescript(DDL)
+    cats = sorted(set(tables["piese"]["categorie"]) | set(tables["vanzari_lunare"]["categorie"]))
+    con.executemany("INSERT INTO categorii VALUES (?)", [(c,) for c in cats])
     for name, df in tables.items():
-        df.to_sql(name, con, index=False)
-    con.execute("CREATE INDEX ix_piese_cod ON piese(cod)")
-    con.execute("CREATE INDEX ix_conc_cod ON preturi_concurenta(cod)")
+        info = con.execute(f"PRAGMA table_info({name})").fetchall()
+        cols = [r[1] for r in info]
+        pk = [r[1] for r in info if r[5]]
+        d = df.drop_duplicates(subset=pk)        # cheia primară nu permite dubluri
+        d = d[[c for c in cols if c in d.columns]].astype(object).where(d.notna(), None)
+        con.executemany(f"INSERT INTO {name} ({', '.join(d.columns)}) VALUES ({', '.join('?' * len(d.columns))})",
+                        d.itertuples(index=False, name=None))
+    con.commit()
     return con
+
+
+def integritate(con) -> pd.DataFrame:
+    """Rânduri care încalcă cheile străine (PRAGMA foreign_key_check)."""
+    return pd.DataFrame(con.execute("PRAGMA foreign_key_check").fetchall(),
+                        columns=["tabel", "rand", "tabel_parinte", "fk"])
+
+
+def db_bytes(con) -> bytes:
+    """Copia bazei ca fișier .db (se deschide cu DB Browser for SQLite)."""
+    return con.serialize()
 
 
 def q(con, sql: str, params=None) -> pd.DataFrame:
@@ -160,8 +239,18 @@ def q(con, sql: str, params=None) -> pd.DataFrame:
 
 def schema(con) -> pd.DataFrame:
     rows = []
-    for (t,) in con.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"):
+    for (t, tip) in con.execute("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') "
+                                "AND name NOT LIKE 'sqlite_%' ORDER BY type, name"):
         n = con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-        cols = [r[1] for r in con.execute(f"PRAGMA table_info({t})")]
-        rows.append({"tabel": t, "rânduri": n, "coloane": ", ".join(cols)})
+        rows.append({"obiect": t, "tip": "tabel" if tip == "table" else "vedere", "rânduri": n,
+                     "coloane": ", ".join(r[1] for r in con.execute(f"PRAGMA table_info({t})"))})
+    return pd.DataFrame(rows)
+
+
+def coloane(con, tabel) -> pd.DataFrame:
+    fks = {r[3]: f"→ {r[2]}.{r[4]}" for r in con.execute(f"PRAGMA foreign_key_list({tabel})")}
+    rows = []
+    for _, nume, tip, notnull, default, pk in con.execute(f"PRAGMA table_info({tabel})"):
+        rows.append({"coloana": nume, "tip": tip or "—", "cheie": ("PK" if pk else "") + (" FK" if nume in fks else ""),
+                     "referă": fks.get(nume, ""), "obligatoriu": bool(notnull or pk)})
     return pd.DataFrame(rows)

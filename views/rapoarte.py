@@ -5,21 +5,31 @@ import streamlit as st
 from core.db import CATEGORII
 from core.reports import raport_excel, raport_pdf
 from core.state import build_context, get_con, params
-from core.ui import card, header
+from core.ui import card, filtre_active, filtru_multi, header
 
-header("📄", "Export Excel / PDF", "Raportul complet de decizie, gata de descărcat")
+EXPLICATIE = """
+**Ce conține raportul:** aceleași calcule ca în aplicație, pentru categoriile și parametrii aleși aici.
+
+- **Excel (.xlsx):** 9 foi: prețuri, piață, prognoză, simulare, comenzi pe țări, clienți etc.
+  Are formatare condiționată (roșu/verde), formule `SUM` și grafice native Excel.
+- **PDF:** raport de 4 pagini cu tabele, grafice, harta comenzilor și concluzia.
+- **CSV:** lista de prețuri recomandate, ca să poată fi importată în magazinul online.
+
+Rapoartele se generează în Python (openpyxl pentru Excel, fpdf2 + matplotlib pentru PDF).
+"""
+
+header("📄", "Export Excel / PDF", "Raportul complet de decizie, gata de descărcat", EXPLICATIE)
 
 con, tables, log = get_con()
 p = params()
 
 with card("Conținutul raportului"):
     c1, c2, c3 = st.columns([2, 1, 1])
-    p["categorii"] = c1.pills("Categorii", CATEGORII, selection_mode="multi", default=CATEGORII)
+    f_cat = filtru_multi(c1, "Categorii", CATEGORII, "fr_cat")
+    p["categorii"] = f_cat or CATEGORII
     p["marja"] = c2.number_input("Marja dorită (%)", 0, 300, int(p["marja"]))
     p["modificare"] = c3.number_input("Simulare preț (%)", -50, 50, int(p["modificare"]))
-if not p["categorii"]:
-    st.info("Alege cel puțin o categorie.")
-    st.stop()
+filtre_active({"Categorii": f_cat})
 
 ctx = build_context(con, tables, log, p)
 stamp = datetime.now().strftime("%Y%m%d_%H%M")

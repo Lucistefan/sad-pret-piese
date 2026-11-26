@@ -22,7 +22,7 @@ pages = {
     ],
     "Date": [
         st.Page("views/surse.py", title="Surse de date", icon=":material/database:"),
-        st.Page("views/sql.py", title="Interogări SQL", icon=":material/terminal:"),
+        st.Page("views/sql.py", title="Baza de date & SQL", icon=":material/terminal:"),
     ],
 }
 nav = st.navigation(pages)
@@ -38,8 +38,9 @@ with st.sidebar:
     else:
         st.session_state["uploads"] = {}
     st.number_input("Marja dorită (%)", 0, 300, 30, 1, key="marja")
-    st.multiselect("Magazine concurente", ["Magazin A", "Magazin B", "Magazin C"],
-                   default=["Magazin A", "Magazin B", "Magazin C"], key="magazine")
+    st.multiselect("Magazine concurente", ["Magazin A", "Magazin B", "Magazin C"], default=[],
+                   key="magazine", placeholder="Toate magazinele")
+    st.toggle("Explicații", value=True, key="explicatii", help="Arată butonul «Cum funcționează?» pe fiecare pagină")
     st.toggle("Arată interogările SQL", value=False, key="arata_sql")
 
 nav.run()

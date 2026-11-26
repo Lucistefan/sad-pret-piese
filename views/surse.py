@@ -5,7 +5,20 @@ from core.db import SHEETS, SOURCE_LABELS
 from core.state import get_con
 from core.ui import card, header
 
-header("🗂️", "Surse de date", "Furnizor, concurență și vânzări, încărcate într-o bază SQLite")
+EXPLICATIE = """
+Aplicația folosește **3 surse de date**, fiecare într-o foaie Google Sheets separată:
+
+| Sursa | Ce conține | Tabele în bază |
+|---|---|---|
+| Furnizor | cod, denumire, categorie, marcă, preț achiziție, transport | `piese`, `categorii` |
+| Prețuri concurență | prețul fiecărei piese la Magazin A, B, C | `preturi_concurenta` |
+| Vânzări | vânzări lunare, comenzi pe țări, tipuri de clienți | `vanzari_lunare`, `comenzi_tari`, `clienti` |
+
+Din bara laterală se poate alege: **Google Sheets (live)**, **copia locală** (merge și fără internet) sau
+**fișierele mele** (CSV / Excel încărcate). Dacă o foaie nu se poate citi, aplicația trece automat pe copia locală.
+"""
+
+header("🗂️", "Surse de date", "Furnizor, concurență și vânzări, încărcate într-o bază SQLite", EXPLICATIE)
 con, tables, log = get_con()
 
 k = st.columns(3)
