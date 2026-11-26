@@ -212,6 +212,20 @@ def coloreaza(df: pd.DataFrame, bun_mare=(), bun_mic=(), intensitate=(), fmt=Non
         sty = sty.apply(lambda col: diverg(col, False), subset=(rows, [c]))
     for c in intensitate:
         sty = sty.apply(scala, subset=(rows, [c]))
+    fmt = dict(fmt or {})
+
+    def cu_icon(baza, bun):
+        def f(v):
+            if pd.isna(v):
+                return ""
+            txt = baza.format(v) if isinstance(baza, str) else baza(v)
+            return f"{semn_icon(v, bun)} {txt}"      # ✅ bine · ❌ problemă · ➖ zero
+        return f
+
+    for c in bun_mare:
+        fmt[c] = cu_icon(fmt.get(c, "{}"), "mare")
+    for c in bun_mic:
+        fmt[c] = cu_icon(fmt.get(c, "{}"), "mic")
     if fmt:
         sty = sty.format(fmt, na_rep="")
     return sty
