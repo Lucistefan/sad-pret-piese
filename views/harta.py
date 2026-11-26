@@ -3,7 +3,7 @@ import streamlit as st
 from core.db import q
 from core.reports import map_plotly, map_png
 from core.state import get_con, sql_box
-from core.ui import card, filtre_active, filtru_multi, grafic, header, reset_filtre, xlsx_export
+from core.ui import card, filtre_active, filtru_multi, grafic, header, reset_filtre, xlsx_export, coloreaza
 
 EXPLICATIE = """
 **Ce arată pagina:** în ce țări se vând piesele (numărul de comenzi pe țară, din sursa Vânzări).
@@ -62,7 +62,8 @@ with card():
                        width="stretch")
     d3.download_button("⬇️ Excel (date, grafic, hartă)", xlsx_export([("Comenzi pe tari", tari, {"tip": "Bare orizontale", "x": "tara", "y": ["comenzi"],
                                                              "titlu": "Comenzi pe țări", "axa": "comenzi",
-                                                             "inaltime": 10, "latime": 14}, map_png(tari))]), "comenzi_tari.xlsx", width="stretch")
+                                                             "inaltime": 10, "latime": 14}, map_png(tari),
+                                                             {"comenzi": "intensitate", "pondere_pct": "intensitate"})]), "comenzi_tari.xlsx", width="stretch")
 
 a, b = st.columns([3, 2])
 with a:
@@ -74,7 +75,9 @@ with a:
                                labels={"tara": "", "comenzi": "comenzi"}, order=d["tara"].tolist()))
 with b:
     with card("Detalii"):
-        st.dataframe(tari[["tara", "comenzi", "pondere_pct"]], hide_index=True, height=470, column_config={
-            "tara": "Țara", "comenzi": "Comenzi",
-            "pondere_pct": st.column_config.ProgressColumn("Pondere", format="%.1f%%", min_value=0,
-                                                           max_value=float(tari["pondere_pct"].max()))})
+        tv = tari[["tara", "comenzi", "pondere_pct"]].copy()
+        tv.insert(0, "loc", ["🥇", "🥈", "🥉"][:len(tv)] + [f"{i}." for i in range(4, len(tv) + 1)])
+        st.dataframe(coloreaza(tv, intensitate=["comenzi", "pondere_pct"], fmt={"pondere_pct": "{:.1f}%"}),
+                     hide_index=True, height=470, column_config={
+                         "loc": st.column_config.Column("", width=40), "tara": "Țara", "comenzi": "Comenzi",
+                         "pondere_pct": "Pondere"})

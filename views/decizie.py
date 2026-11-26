@@ -5,7 +5,7 @@ from core.db import CATEGORII, q
 from core.models import decizie
 from core.state import get_con, sql_box
 from core.ui import (card, filtre_active, filtru_multi, grafic, header, pozitie_badge, reset_filtre, sau_toate,
-                     style_fig, verdict_badge, xlsx_export)
+                     style_fig, verdict_badge, xlsx_export, coloreaza)
 
 EXPLICATIE = """
 **Ce decide pagina:** ce preț de vânzare pun pe fiecare piesă.
@@ -109,16 +109,23 @@ with card("Prețul față de piață"):
 
 with card("Prețuri"):
     show = df[["cod", "denumire", "marca", "cost_total", "pret_propus", "media_concurenta", "recomandare",
-               "pret_recomandat", "marja_realizata_%", "pozitie_piata"]].copy()
+               "pret_recomandat", "marja_realizata_%", "marja_max_competitiva_%", "pozitie_piata"]].copy()
+    show.insert(6, "fata_de_piata", ((show["pret_propus"] / show["media_concurenta"] - 1) * 100).round(1))
     show["recomandare"] = show["recomandare"].map(verdict_badge)
     show["pozitie_piata"] = show["pozitie_piata"].map(pozitie_badge)
-    lei = lambda t: st.column_config.NumberColumn(t, format="%d lei")  # noqa: E731
-    st.dataframe(show, hide_index=True, column_config={
-        "cod": "Cod", "denumire": "Denumire", "marca": "Marcă", "cost_total": lei("Cost"),
-        "pret_propus": lei(f"Preț propus ({marja}%)"), "media_concurenta": lei("Media pieței"),
-        "recomandare": "Verdict", "pret_recomandat": lei("Preț recomandat"),
-        "marja_realizata_%": st.column_config.ProgressColumn("Marjă recomandată", format="%.1f%%", min_value=0,
-                                                              max_value=max(60.0, float(df["marja_realizata_%"].max()))),
+    st.caption("🟩 verde = bine · 🟥 roșu = problemă · culoarea e mai intensă cu cât diferența e mai mare")
+    lei = "{:,.0f} lei"
+    st.dataframe(coloreaza(show, bun_mic=["fata_de_piata"], bun_mare=["marja_max_competitiva_%"],
+                           intensitate=["marja_realizata_%"],
+                           fmt={"cost_total": lei, "pret_propus": lei, "media_concurenta": lei, "pret_recomandat": lei,
+                                "fata_de_piata": "{:+.1f}%", "marja_realizata_%": "{:.1f}%",
+                                "marja_max_competitiva_%": "{:.1f}%"}),
+                 hide_index=True, column_config={
+        "cod": "Cod", "denumire": "Denumire", "marca": "Marcă", "cost_total": "Cost",
+        "pret_propus": f"Preț propus ({marja}%)", "media_concurenta": "Media pieței",
+        "fata_de_piata": st.column_config.Column("Față de piață", help="Preț propus față de media pieței"),
+        "recomandare": "Verdict", "pret_recomandat": "Preț recomandat",
+        "marja_realizata_%": "Marjă recomandată", "marja_max_competitiva_%": "Marjă max. competitivă",
         "pozitie_piata": "Poziție pe piață"})
     exp = df[["cod", "denumire", "marca", "categorie", "cost_total", "pret_propus", "media_concurenta",
               "min_concurenta", "max_concurenta", "recomandare", "pret_recomandat", "marja_realizata_%",
@@ -130,7 +137,10 @@ with card("Prețuri"):
     else:
         g = {"tip": "Coloane", "x": "cod", "y": ["cost_total", "pret_propus", "media_concurenta", "pret_recomandat"],
              "titlu": f"Cost, preț propus ({marja}%), media pieței, preț recomandat", "axa": "lei"}
-    st.download_button("⬇️ Exportă tabelul și graficul (Excel)", xlsx_export([("Decizie pret", exp, g, None)]),
+    st.download_button("⬇️ Exportă tabelul și graficul (Excel)", xlsx_export([("Decizie pret", exp, g, None,
+                                                                {"dif_fata_de_piata_%": "bun_mic",
+                                                                 "marja_max_competitiva_%": "bun_mare",
+                                                                 "marja_realizata_%": "intensitate"})]),
                        "decizie_pret.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 with card("Detaliu piesă"):

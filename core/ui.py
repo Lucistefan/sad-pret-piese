@@ -154,7 +154,67 @@ def style_fig(fig, height=380, legend_bottom=False):
 
 
 def verdict_badge(v: str) -> str:
-    return {"Competitiv": "🟢 Competitiv", "Prea scump": "🔴 Prea scump"}.get(v, v)
+    return {"Competitiv": "✅ Competitiv", "Prea scump": "❌ Prea scump"}.get(v, v)
+
+
+def semn_icon(v, bun="mare", zero=0.0):
+    """✅ / ⚠️ / ❌ după semnul valorii (bun='mare': pozitiv e bine; 'mic': negativ e bine)."""
+    if pd.isna(v) or abs(v) <= zero:
+        return "➖"
+    ok = (v > 0) == (bun == "mare")
+    return "✅" if ok else "❌"
+
+
+def trend_icon(v, prag=0.3):
+    if pd.isna(v) or abs(v) < prag:
+        return "➡️ stabil"
+    return "📈 crește" if v > 0 else "📉 scade"
+
+
+# ------------------------------------------------------------------ tabele colorate pe intensitate
+_VERDE, _ROSU, _ALBASTRU = (22, 163, 74), (220, 38, 38), (37, 99, 235)
+
+
+def _rgba(rgb, a):
+    return f"background-color: rgba({rgb[0]},{rgb[1]},{rgb[2]},{a:.2f})"
+
+
+def coloreaza(df: pd.DataFrame, bun_mare=(), bun_mic=(), intensitate=(), fmt=None, fara=None):
+    """Colorează celulele după intensitate.
+
+    bun_mare    : verde pentru valori pozitive, roșu pentru negative (cu cât mai mare |v|, cu atât mai intens)
+    bun_mic     : invers (ex. preț peste piață = roșu)
+    intensitate : albastru, de la minim (deschis) la maxim (închis)
+    fara        : rânduri care nu se colorează (ex. rândul Total, ca să nu strice scala)
+    """
+    sty = df.style
+    rows = df.index if fara is None else df.index[~fara]
+
+    def diverg(col, pozitiv_bun):
+        m = float(col.abs().max() or 1)
+        out = []
+        for v in col:
+            if pd.isna(v) or v == 0:
+                out.append("")
+                continue
+            bun = (v > 0) == pozitiv_bun
+            out.append(_rgba(_VERDE if bun else _ROSU, 0.10 + 0.55 * abs(v) / m))
+        return out
+
+    def scala(col):
+        lo, hi = float(col.min()), float(col.max())
+        span = (hi - lo) or 1
+        return [_rgba(_ALBASTRU, 0.06 + 0.55 * (v - lo) / span) if pd.notna(v) else "" for v in col]
+
+    for c in bun_mare:
+        sty = sty.apply(lambda col: diverg(col, True), subset=(rows, [c]))
+    for c in bun_mic:
+        sty = sty.apply(lambda col: diverg(col, False), subset=(rows, [c]))
+    for c in intensitate:
+        sty = sty.apply(scala, subset=(rows, [c]))
+    if fmt:
+        sty = sty.format(fmt, na_rep="")
+    return sty
 
 
 def pozitie_badge(v: str) -> str:
@@ -206,7 +266,8 @@ def _grafic_excel(ws, df, g):
 
 
 def xlsx_export(foi) -> bytes:
-    """Excel cu mai multe foi. Fiecare foaie = (nume, tabel, grafic | None, imagine PNG | None).
+    """Excel cu mai multe foi. Fiecare foaie = (nume, tabel, grafic | None, imagine PNG | None[, reguli]).
+    reguli = {coloana: "bun_mare" | "bun_mic" | "intensitate" | "trend"} → culori + iconițe în Excel.
 
     grafic = {"tip": "Coloane"|"Coloane stivuite"|"Bare orizontale"|"Linii"|"Arie"|"Plăcintă",
               "x": coloana de categorii, "y": [coloane de valori], "titlu": ..., "axa": ...}
@@ -216,7 +277,10 @@ def xlsx_export(foi) -> bytes:
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
-        for nume, df, g, img in foi:
+        from core.reports import reguli_excel
+        for foaie in foi:
+            nume, df, g, img = foaie[:4]
+            reguli = foaie[4] if len(foaie) > 4 else None
             df.to_excel(w, sheet_name=nume, index=False)
             ws = w.book[nume]
             for i, col in enumerate(df.columns, 1):
@@ -225,6 +289,11 @@ def xlsx_export(foi) -> bytes:
                 c = ws.cell(1, i)
                 c.font, c.fill = Font(bold=True, color="FFFFFF"), PatternFill("solid", fgColor="2563EB")
             ws.freeze_panes = "A2"
+            ws.page_setup.orientation = "landscape"          # la tipărire: o pagină pe lățime
+            ws.sheet_properties.pageSetUpPr.fitToPage = True
+            ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+            if reguli:
+                reguli_excel(ws, df, reguli)
             if g:
                 _grafic_excel(ws, df, g)
             if img:

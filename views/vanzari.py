@@ -5,7 +5,7 @@ import streamlit as st
 from core.db import q
 from core.models import prognoza
 from core.state import get_con, sql_box
-from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_export
+from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_export, coloreaza, trend_icon
 
 EXPLICATIE = """
 **Ce face pagina:** estimează câte piese se vor vinde în lunile următoare, pe fiecare categorie.
@@ -78,9 +78,15 @@ with card("Vânzări lunare și prognoză"):
 
 with card("Indicatori pe categorie"):
     t = det[det["categorie"].isin(cats + ["Total"])]
-    st.dataframe(t, hide_index=True, column_config={
-        "categorie": "Categorie", "panta_lunara": st.column_config.NumberColumn("Trend", format="%+.2f buc/lună"),
-        "R2": st.column_config.ProgressColumn("Siguranța trendului (R²)", format="%.2f", min_value=0, max_value=1),
+    tv = t.copy()
+    tv.insert(1, "tendinta", tv["panta_lunara"].map(trend_icon))
+    tv.insert(4, "siguranta", tv["R2"].map(lambda r: "🟢 mare" if r >= 0.6 else ("🟡 medie" if r >= 0.3 else "🔴 mică")))
+    st.dataframe(coloreaza(tv, bun_mare=["panta_lunara"], intensitate=["R2", "prognoza_luna_urm", "total_12_luni"],
+                           fmt={"panta_lunara": "{:+.2f} buc/lună", "R2": "{:.2f}", "prognoza_luna_urm": "{:.0f}"},
+                           fara=(tv["categorie"] == "Total").to_numpy()),
+                 hide_index=True, column_config={
+        "categorie": "Categorie", "tendinta": "Tendință", "panta_lunara": "Trend", "siguranta": "Siguranță",
+        "R2": st.column_config.Column("R²", help="Siguranța trendului: aproape de 1 = vânzările urmează clar trendul"),
         "luna_max": "Luna maximă", "luna_min": "Luna minimă",
         "total_12_luni": "Total 12 luni", "prognoza_luna_urm": "Prognoză"})
     prog_w = fc[fc["categorie"].isin(cats)].assign(luna=lambda d: "Prognoză " + d["pas"].astype(str)) \
@@ -92,10 +98,12 @@ with card("Indicatori pe categorie"):
     g_tip = "Linii" if tip == "Linii" else tip
     st.download_button("⬇️ Exportă vânzările, prognoza și graficul (Excel)", xlsx_export([
         ("Vanzari si prognoza", serie, {"tip": g_tip, "x": "luna", "y": cats, "titlu": f"Vânzări lunare și prognoză ({metoda})",
-                                        "axa": "bucăți"}, None),
+                                        "axa": "bucăți"}, None, {c: "intensitate" for c in cats}),
         ("Indicatori", t, {"tip": "Coloane", "x": "categorie", "y": ["prognoza_luna_urm"],
                            "titlu": "Prognoza pe luna următoare", "axa": "bucăți",
-                           "randuri": int((t["categorie"] != "Total").sum())}, None)]), "vanzari_prognoza.xlsx")
+                           "randuri": int((t["categorie"] != "Total").sum())}, None,
+         {"panta_lunara": "trend", "R2": "intensitate", "prognoza_luna_urm": "intensitate"})]),
+        "vanzari_prognoza.xlsx")
 
 sqlc = """SELECT tip_client, comenzi, valoare,
        ROUND(valoare * 1.0 / comenzi, 1) AS valoare_medie_comanda,
@@ -113,12 +121,14 @@ with card("Clienți"):
         st.plotly_chart(grafic(cl, "tip_client", col, tip_c, color="tip_client", height=300,
                                labels={"tip_client": "", col: ind}))
     with b:
-        st.dataframe(cl, hide_index=True, column_config={
-            "tip_client": "Tip client", "comenzi": "Comenzi",
-            "valoare": st.column_config.NumberColumn("Valoare", format="%d lei"),
-            "valoare_medie_comanda": st.column_config.NumberColumn("Medie / comandă", format="%d lei"),
-            "pondere_valoare": st.column_config.NumberColumn("Pondere", format="%.1f%%")})
+        st.dataframe(coloreaza(cl, intensitate=["comenzi", "valoare", "valoare_medie_comanda", "pondere_valoare"],
+                               fmt={"valoare": "{:,.0f} lei", "valoare_medie_comanda": "{:,.0f} lei",
+                                    "pondere_valoare": "{:.1f}%"}),
+                     hide_index=True, column_config={
+            "tip_client": "Tip client", "comenzi": "Comenzi", "valoare": "Valoare",
+            "valoare_medie_comanda": "Medie / comandă", "pondere_valoare": "Pondere"})
     st.download_button("⬇️ Exportă clienții și graficul (Excel)", xlsx_export([
-        ("Clienti", cl, {"tip": tip_c, "x": "tip_client", "y": [col], "titlu": ind, "axa": ""}, None)]),
+        ("Clienti", cl, {"tip": tip_c, "x": "tip_client", "y": [col], "titlu": ind, "axa": ""}, None,
+                    {"comenzi": "intensitate", "valoare": "intensitate", "valoare_medie_comanda": "intensitate"})]),
         "clienti.xlsx", key="dl_cl")
     sql_box(sqlc)

@@ -2,7 +2,7 @@ import streamlit as st
 
 from core.db import CATEGORII
 from core.state import build_context, get_con, params
-from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre
+from core.ui import PAL, card, coloreaza, filtre_active, filtru_multi, grafic, header, reset_filtre
 
 EXPLICATIE = """
 **PrețPiese** este un sistem de asistare a deciziilor pentru un magazin online de piese auto.
@@ -63,14 +63,18 @@ a, b = st.columns([3, 2])
 with a:
     with card("Prețuri de revizuit"):
         if scumpe.empty:
-            st.success("Toate piesele sunt competitive la marja aleasă.")
+            st.success("Toate piesele sunt competitive la marja aleasă.", icon="✅")
         else:
             t = scumpe[["cod", "denumire", "pret_propus", "media_concurenta", "pret_recomandat"]].copy()
-            st.dataframe(t, hide_index=True, height=260, column_config={
-                "cod": "Cod", "denumire": "Denumire",
-                "pret_propus": st.column_config.NumberColumn("Preț propus", format="%d lei"),
-                "media_concurenta": st.column_config.NumberColumn("Media pieței", format="%d lei"),
-                "pret_recomandat": st.column_config.NumberColumn("Preț recomandat", format="%d lei")})
+            t.insert(0, "ok", "❌")
+            t["peste_piata"] = ((t["pret_propus"] / t["media_concurenta"] - 1) * 100).round(1)
+            st.dataframe(coloreaza(t, bun_mic=["peste_piata"],
+                                   fmt={"pret_propus": "{:,.0f} lei", "media_concurenta": "{:,.0f} lei",
+                                        "pret_recomandat": "{:,.0f} lei", "peste_piata": "{:+.1f}%"}),
+                         hide_index=True, height=260, column_config={
+                "ok": st.column_config.Column("", width=40), "cod": "Cod", "denumire": "Denumire",
+                "pret_propus": "Preț propus", "media_concurenta": "Media pieței", "pret_recomandat": "Preț recomandat",
+                "peste_piata": "Peste piață"})
         st.page_link("views/decizie.py", label="Deschide analiza de preț", icon=":material/arrow_forward:")
 with b:
     with card("Prognoză luna următoare"):

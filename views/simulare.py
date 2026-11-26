@@ -5,7 +5,7 @@ import streamlit as st
 from core.db import CATEGORII
 from core.models import ELASTICITATE, REACTIE_IMPLICITA, curba_simulare, marja_pe_categorie, prognoza, simulare
 from core.state import get_con, sql_box
-from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_export
+from core.ui import PAL, card, filtre_active, filtru_multi, grafic, header, reset_filtre, style_fig, xlsx_export, coloreaza, semn_icon
 
 EXPLICATIE = """
 **Întrebarea:** dacă schimb prețul cu X%, câștig sau pierd bani?
@@ -71,10 +71,10 @@ buc_acum, buc_dupa = int(sim["vanzari_estimate"].sum()), int(sim["vanzari_dupa"]
 if mod == 0:
     st.info("Alege o modificare de preț.")
 elif tot_prof > 0:
-    st.success(f"**Merită.** Profitul crește cu {lei(tot_prof)} (încasările se modifică cu {tot_inc:+,.0f} lei)."
+    st.success(icon="✅", body=f"**Merită.** Profitul crește cu {lei(tot_prof)} (încasările se modifică cu {tot_inc:+,.0f} lei)."
                .replace(",", "."))
 else:
-    st.error(f"**Nu merită.** Profitul scade cu {lei(-tot_prof)}"
+    st.error(icon="❌", body=f"**Nu merită.** Profitul scade cu {lei(-tot_prof)}"
              + (f", chiar dacă încasările cresc cu {lei(tot_inc)}." if tot_inc > 0 else f", iar încasările scad cu {lei(-tot_inc)}."))
 
 k = st.columns(4)
@@ -86,25 +86,26 @@ k[2].metric("Profit", lei(sim["profit_dupa"].sum()), f"{tot_prof:+,.0f} lei".rep
 k[3].metric("Profit înainte", lei(sim["profit_acum"].sum()))
 
 with card("Pe categorii"):
-    tip = st.segmented_control("Tip grafic", ["Coloane", "Bare orizontale", "Tabel"], default="Coloane",
+    tip = st.segmented_control("Tip grafic", ["Coloane", "Bare orizontale"], default="Coloane",
                                key="g_sim", label_visibility="collapsed") or "Coloane"
-    if tip == "Tabel":
-        t = sim[["categorie", "reactie_clienti", "pret_actual", "vanzari_estimate", "vanzari_dupa", "castig_pierdere",
-                 "dif_profit"]].copy()
-        t["verdict"] = t["dif_profit"].apply(lambda v: "🟢 merită" if v > 0 else "🔴 nu merită")
-        leicol = lambda x: st.column_config.NumberColumn(x, format="%+d lei")  # noqa: E731
-        st.dataframe(t, hide_index=True, column_config={
-            "categorie": "Categorie", "reactie_clienti": "Sensibilitate",
-            "pret_actual": st.column_config.NumberColumn("Preț actual", format="%d lei"),
-            "vanzari_estimate": "Buc. acum", "vanzari_dupa": "Buc. după",
-            "castig_pierdere": leicol("Δ încasări"), "dif_profit": leicol("Δ profit"), "verdict": "Verdict"})
-    else:
-        long = sim.melt(id_vars="categorie", value_vars=["castig_pierdere", "dif_profit"], var_name="indicator",
-                        value_name="lei")
-        long["indicator"] = long["indicator"].map({"castig_pierdere": "Δ încasări", "dif_profit": "Δ profit"})
-        fig = grafic(long, "categorie", "lei", tip, color="indicator", height=340,
-                     color_map={"Δ încasări": "#94a3b8", "Δ profit": "#2563eb"}, labels={"categorie": ""})
-        st.plotly_chart(fig)
+    long = sim.melt(id_vars="categorie", value_vars=["castig_pierdere", "dif_profit"], var_name="indicator",
+                    value_name="lei")
+    long["indicator"] = long["indicator"].map({"castig_pierdere": "Δ încasări", "dif_profit": "Δ profit"})
+    st.plotly_chart(grafic(long, "categorie", "lei", tip, color="indicator", height=320,
+                           color_map={"Δ încasări": "#94a3b8", "Δ profit": "#2563eb"}, labels={"categorie": ""}))
+    t = sim[["categorie", "reactie_clienti", "pret_actual", "vanzari_estimate", "vanzari_dupa", "castig_pierdere",
+             "dif_profit"]].copy()
+    t.insert(0, "ok", t["dif_profit"].map(lambda v: semn_icon(v)))
+    t["verdict"] = t["dif_profit"].map(lambda v: "merită" if v > 0 else ("fără efect" if v == 0 else "nu merită"))
+    t["reactie_clienti"] = t["reactie_clienti"].map({"Mult": "🔥 Mult", "Mediu": "🌤️ Mediu", "Puțin": "🧊 Puțin"})
+    st.caption("✅ merită (profitul crește) · ❌ nu merită (profitul scade) · culoarea e mai intensă cu cât efectul e mai mare")
+    st.dataframe(coloreaza(t, bun_mare=["castig_pierdere", "dif_profit"],
+                           fmt={"pret_actual": "{:,.0f} lei", "vanzari_dupa": "{:.0f}", "vanzari_estimate": "{:.0f}", "castig_pierdere": "{:+,.0f} lei",
+                                "dif_profit": "{:+,.0f} lei"}),
+                 hide_index=True, column_config={
+        "ok": st.column_config.Column("", width=40), "categorie": "Categorie", "reactie_clienti": "Sensibilitate",
+        "pret_actual": "Preț actual", "vanzari_estimate": "Buc. acum", "vanzari_dupa": "Buc. după",
+        "castig_pierdere": "Δ încasări", "dif_profit": "Δ profit", "verdict": "Verdict"})
     sql_box(sqlp, {"marja": marja})
 
 curba = curba_simulare(prog, preturi, costuri, reactii, elasticitate=elast)
@@ -130,16 +131,20 @@ with card("Modificarea optimă"):
                          "Optim profit": int(curba[curba["categorie"] == cat].set_index("modificare_%")["dif_profit"].idxmax()),
                          "Optim încasări": int(curba[curba["categorie"] == cat].set_index("modificare_%")["dif_incasari"].idxmax())}
                         for cat in cats])
-    st.dataframe(opt, hide_index=True, column_config={
-        "Optim profit": st.column_config.NumberColumn(format="%+d%%"),
-        "Optim încasări": st.column_config.NumberColumn(format="%+d%%")})
+    directie = lambda v: f"⬇️ {v:+d}% (reducere)" if v < 0 else (f"⬆️ {v:+d}% (creștere)" if v > 0 else "➡️ 0%")  # noqa: E731
+    opt_v = opt.copy()
+    opt_v["Optim profit"] = opt_v["Optim profit"].map(directie)
+    opt_v["Optim încasări"] = opt_v["Optim încasări"].map(directie)
+    opt_v["Sensibilitate"] = opt_v["Sensibilitate"].map({"Mult": "🔥 Mult", "Mediu": "🌤️ Mediu", "Puțin": "🧊 Puțin"})
+    st.dataframe(opt_v, hide_index=True)
     curba_w = curba.pivot_table(index="modificare_%", columns="categorie", values=col).reset_index()
     curba_w["Total"] = curba_w[cats].sum(axis=1)
     curba_w.columns.name = None
     st.download_button("⬇️ Exportă simularea și graficele (Excel)", xlsx_export([
-        ("Simulare", sim, {"tip": "Coloane" if tip == "Tabel" else tip, "x": "categorie",
+        ("Simulare", sim, {"tip": tip, "x": "categorie",
                            "y": ["castig_pierdere", "dif_profit"], "titlu": f"Efectul modificării de {mod:+d}%",
-                           "axa": "lei"}, None),
+                           "axa": "lei"}, None, {"castig_pierdere": "bun_mare", "dif_profit": "bun_mare"}),
         ("Curba", curba_w, {"tip": "Linii", "x": "modificare_%", "y": [*cats, "Total"],
-                            "titlu": f"Diferență {ind.lower()} după modificarea prețului", "axa": "lei"}, None),
+                            "titlu": f"Diferență {ind.lower()} după modificarea prețului", "axa": "lei"}, None,
+         {c: "bun_mare" for c in [*cats, "Total"]}),
         ("Optim", opt, None, None)]), "simulare.xlsx")

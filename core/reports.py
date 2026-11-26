@@ -308,6 +308,32 @@ HEADER_FILL = PatternFill("solid", fgColor="2563EB")
 THIN = Side(style="thin", color="D0D7E2")
 
 
+def reguli_excel(ws, df, reguli: dict):
+    """Formatare condiționată în Excel: culori pe intensitate + iconițe (✓ ! ✗, săgeți).
+
+    reguli = {coloana: "bun_mare" | "bun_mic" | "intensitate" | "trend"}
+    """
+    from openpyxl.formatting.rule import ColorScaleRule, IconSetRule
+
+    n = len(df) + 1
+    for col, tip in reguli.items():
+        if col not in df.columns or n < 2:
+            continue
+        L = get_column_letter(list(df.columns).index(col) + 1)
+        rng = f"{L}2:{L}{n}"
+        if tip in ("bun_mare", "bun_mic", "trend"):
+            rosu, verde = "F8696B", "63BE7B"
+            jos, sus = (rosu, verde) if tip != "bun_mic" else (verde, rosu)
+            ws.conditional_formatting.add(rng, ColorScaleRule(start_type="min", start_color=jos, mid_type="num",
+                                                              mid_value=0, mid_color="FFFFFF", end_type="max",
+                                                              end_color=sus))
+            stil = "3Arrows" if tip == "trend" else "3Symbols"
+            ws.conditional_formatting.add(rng, IconSetRule(stil, "num", [0, 0, 1e-9], reverse=(tip == "bun_mic")))
+        elif tip == "intensitate":
+            ws.conditional_formatting.add(rng, ColorScaleRule(start_type="min", start_color="F1F5FE",
+                                                              end_type="max", end_color="5B8FF9"))
+
+
 def _format_sheet(ws, df, money_cols=(), pct_cols=()):
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFF")
@@ -315,6 +341,9 @@ def _format_sheet(ws, df, money_cols=(), pct_cols=()):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws.row_dimensions[1].height = 30
     ws.freeze_panes = "A2"
+    ws.page_setup.orientation = "landscape"          # la tipărire: o pagină pe lățime
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
     for i, col in enumerate(df.columns, 1):
         width = max(len(str(col)), *(len(str(v)) for v in df[col].head(200))) + 2
         ws.column_dimensions[get_column_letter(i)].width = min(max(width, 9), 40)
@@ -377,7 +406,15 @@ def raport_excel(ctx: dict) -> bytes:
         for name, frame in simple.items():
             _format_sheet(wb[name], frame, money_cols={"pret", "valoare"})
         _format_sheet(wb["Vanzari lunare"], lun)
+        reguli_excel(wb["Decizie pret"], dec, {"marja_max_competitiva_%": "bun_mare", "marja_realizata_%": "intensitate",
+                                               "profit_unitar": "intensitate"})
+        reguli_excel(wb["Prognoza"], ctx["prognoza_det"], {"panta_lunara": "trend", "R2": "intensitate",
+                                                          "prognoza_luna_urm": "intensitate"})
+        reguli_excel(wb["Curba simulare"], curba_w, {c: "bun_mare" for c in curba_w.columns[1:]})
+        reguli_excel(wb["Comenzi pe tari"], ctx["tari"], {"comenzi": "intensitate", "pondere_pct": "intensitate"})
+        reguli_excel(wb["Clienti"], ctx["clienti"], {"valoare": "intensitate", "comenzi": "intensitate"})
         ws = wb["Vanzari lunare"]
+        reguli_excel(ws, lun, {c: "intensitate" for c in lun.columns[2:]})
         lc = LineChart()
         lc.title, lc.y_axis.title, lc.height, lc.width = "Vânzări lunare (bucăți)", "buc", 8, 18
         lc.add_data(Reference(ws, min_col=3, max_col=2 + lun.shape[1] - 2, min_row=1, max_row=len(lun) + 1),
@@ -389,6 +426,7 @@ def raport_excel(ctx: dict) -> bytes:
         _format_sheet(wb["Simulare"], sim, money_cols={"pret_actual", "incasari_acum", "incasari_dupa",
                                                        "castig_pierdere", "profit_acum", "profit_dupa", "dif_profit"})
         ws = wb["Simulare"]
+        reguli_excel(ws, sim, {"castig_pierdere": "bun_mare", "dif_profit": "bun_mare"})
         r = len(sim) + 2
         ws.cell(r, 1, "TOTAL").font = Font(bold=True)
         for name in ["incasari_acum", "incasari_dupa", "castig_pierdere", "profit_acum", "profit_dupa", "dif_profit"]:
